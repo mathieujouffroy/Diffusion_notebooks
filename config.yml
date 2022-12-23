@@ -1,0 +1,80 @@
+dataset_name: "daspartho/bored-ape"
+dataset_config_name: null
+train_data_dir: null
+output_dir: "test" #"ddpm-church-finetune-wikiart-256"
+cache_dir: null
+logging_dir: "logs"
+# Whether to use ["tensorboard", "wandb"]
+logger: "wandb"
+
+seed: 42
+resolution: 256
+nbr_channels: 3
+train_batch_size: 4
+eval_batch_size: 4
+dataloader_num_workers: 0
+num_epochs: 30
+log_images_every: "steps" #"epochs" 
+save_model_every: "steps" #"epochs" 
+save_images_epochs: 1
+save_model_epochs: 1
+save_images_steps: 250
+save_model_steps: 1500
+
+# Whether to use finetune a pretrained model
+finetune: False #True
+pretrained_model: "google/ddpm-church-256"
+
+# Whether the model should predict the 'epsilon'/noise error or directly the reconstructed image 'x0'
+# choice : ["epsilon", "sample"]
+prediction_type: "epsilon"
+
+# Number of updates steps to accumulate before performing a backward/update pass.
+gradient_accumulation_steps: 2
+learning_rate: 0.000005 # 1e-4/5e-4
+# scheduler type between ["linear", "cosine", "cosine_with_restarts", "polynomial","constant", "constant_with_warmup", "exponential"]
+lr_scheduler: "cosine" 
+lr_warmup_steps: 500
+adam_beta1: 0.95
+adam_beta2: 0.999
+adam_weight_decay: 0.000002 #1e-6
+adam_epsilon: 0.00000001
+
+# chose between "ddpm", "ddim"
+scheduler: 'ddim'
+ddpm_num_steps: 1000
+# ["squaredcos_cap_v2", "linear"]
+ddpm_beta_schedule: "squaredcos_cap_v2"
+loss_type: 'l2'
+
+# Exponential Moving Average for the final model weights
+use_ema: True
+# Inverse gamma value for the EMA decay.
+ema_inv_gamma: 1.0
+# Power value for the EMA decay
+ema_power: 0.75
+# Maximum decay magnitude for EMA
+ema_max_decay: 0.9999
+
+
+# For distributed training: local_rank
+local_rank: -1
+# Whether to use mixed precision -- ["no", "fp16", "bf16"]
+mixed_precision: "no" 
+
+
+# Save a checkpoint of the training state every X updates. 
+# These checkpoints are only suitable for resuming.
+checkpointing: False
+checkpointing_steps: 500
+# Use a path saved by `--checkpointing_steps`, or `latest` to automatically select the last available checkpoint.
+resume_from_checkpoint: null
+
+
+push_to_hub: False
+# token to use to push to the Model Hub
+hub_token: null
+# name of the repository to keep in sync with the local `output_dir`
+hub_model_id: null
+# whether or not to create a private repository
+#hub_private_repo:
