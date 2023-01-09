@@ -1,7 +1,7 @@
-dataset_name: "daspartho/bored-ape"
+dataset_name: "huggan/wikiart"
 dataset_config_name: null
 train_data_dir: null
-output_dir: "test" #"ddpm-church-finetune-wikiart-256"
+output_dir: "ddpm-church-finetune-wikiart-256"
 cache_dir: null
 logging_dir: "logs"
 # Whether to use ["tensorboard", "wandb"]
@@ -13,16 +13,16 @@ nbr_channels: 3
 train_batch_size: 4
 eval_batch_size: 4
 dataloader_num_workers: 0
-num_epochs: 30
+num_epochs: 1
 log_images_every: "steps" #"epochs" 
 save_model_every: "steps" #"epochs" 
 save_images_epochs: 1
 save_model_epochs: 1
 save_images_steps: 250
-save_model_steps: 1500
+save_model_steps: 2000
 
 # Whether to use finetune a pretrained model
-finetune: False #True
+finetune: True #False
 pretrained_model: "google/ddpm-church-256"
 
 # Whether the model should predict the 'epsilon'/noise error or directly the reconstructed image 'x0'
@@ -31,13 +31,13 @@ prediction_type: "epsilon"
 
 # Number of updates steps to accumulate before performing a backward/update pass.
 gradient_accumulation_steps: 2
-learning_rate: 0.000005 # 1e-4/5e-4
+learning_rate: 0.000009 # 1e-4/5e-4
 # scheduler type between ["linear", "cosine", "cosine_with_restarts", "polynomial","constant", "constant_with_warmup", "exponential"]
 lr_scheduler: "cosine" 
-lr_warmup_steps: 500
-adam_beta1: 0.95
+lr_warmup_steps: 600
+adam_beta1: 0.9
 adam_beta2: 0.999
-adam_weight_decay: 0.000002 #1e-6
+adam_weight_decay: 0.000001 #1e-6
 adam_epsilon: 0.00000001
 
 # chose between "ddpm", "ddim"
@@ -45,10 +45,10 @@ scheduler: 'ddim'
 ddpm_num_steps: 1000
 # ["squaredcos_cap_v2", "linear"]
 ddpm_beta_schedule: "squaredcos_cap_v2"
-loss_type: 'l2'
+loss_type: 'mse'
 
 # Exponential Moving Average for the final model weights
-use_ema: True
+use_ema: False #True
 # Inverse gamma value for the EMA decay.
 ema_inv_gamma: 1.0
 # Power value for the EMA decay
