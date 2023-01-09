@@ -16,14 +16,11 @@ def set_seed(args):
     torch.cuda.manual_seed(args.seed)
 
 
-def set_logging(args, log_type):
+def set_logging(args, log_dir):
     "Defines the file in which we will write our training logs"
     
     date = datetime.datetime.now().strftime("%d:%m-%H:%M")
-    if log_type == 'train':
-        log_file = os.path.join(f"{args.output_dir}/train", f"{args.m_name}_{date}.log")
-    elif log_type == 'infer':
-        log_file = os.path.join(f"{args.output_dir}/infer", f"{args.m_name}_{date}.log")
+    log_file = os.path.join(log_dir, f"log_{date}.log")
 
     for handler in logging.root.handlers[:]:
         logging.root.removeHandler(handler)

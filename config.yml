@@ -31,7 +31,7 @@ prediction_type: "epsilon"
 
 # Number of updates steps to accumulate before performing a backward/update pass.
 gradient_accumulation_steps: 2
-learning_rate: 0.000009 # 1e-4/5e-4
+learning_rate: 0.00001 # 1e-4/5e-4
 # scheduler type between ["linear", "cosine", "cosine_with_restarts", "polynomial","constant", "constant_with_warmup", "exponential"]
 lr_scheduler: "cosine" 
 lr_warmup_steps: 600

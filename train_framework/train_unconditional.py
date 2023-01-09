@@ -330,7 +330,6 @@ def main(args):
                     accelerator.clip_grad_norm_(model.parameters(), 1.0)
 
 
-                #if (step+1) % args.gradient_accumulation_steps == 0:
                 optimizer.step()
                 if args.lr_scheduler != 'exponential':
                     lr_scheduler.step()
@@ -354,7 +353,7 @@ def main(args):
 
             if accelerator.is_main_process:
                 if args.log_images_every == "steps":
-                    if (global_step) % args.save_images_steps == 0 or global_step == 1 or global_step == total_train_steps:
+                    if (global_step % args.save_images_steps == 0) or (global_step == 1) or (global_step == total_train_steps):
                         if args.finetune:
                             x = torch.randn(8, 3, args.resolution, args.resolution).to('cuda') # Batch of 8
                             for i, t in tqdm(enumerate(sampling_scheduler.timesteps)):
@@ -396,12 +395,16 @@ def main(args):
                                 accelerator.log({'Sample generations': wandb.Image(im)}, step=global_step)
                 
                 if args.save_model_every == "steps":
-                    if (global_step % args.save_model_steps == 0 and global_step > 1000) or global_step == total_train_steps:
-                        image_pipe.save_pretrained(f"{args.output_dir}_step_{global_step}")
+                    if global_step >= 5000:
+                        if (global_step % args.save_model_steps == 0) or (global_step == total_train_steps):
+                            image_pipe.save_pretrained(f"{args.output_dir}_step_{global_step}")
             
             if global_step >= total_train_steps:
+                image_pipe.save_pretrained(f"{args.output_dir}_step_{global_step}")
                 break
         
+        image_pipe.save_pretrained(f"{args.output_dir}_step_{global_step}")
+
         progress_bar.close()
 
         accelerator.wait_for_everyone()
