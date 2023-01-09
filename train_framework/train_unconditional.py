@@ -12,6 +12,8 @@ from PIL import Image
 import torch, torchvision
 import torch.nn.functional as F
 
+import logging
+
 from accelerate import Accelerator
 from accelerate.logging import get_logger
 from datasets import load_dataset
@@ -33,13 +35,12 @@ from tqdm.auto import tqdm
 
 import wandb
 
-from utils import YamlNamespace, set_wandb_project_run
+from utils import YamlNamespace, set_logging, wandb_cfg
 
 # Will error if the minimal version of diffusers is not installed. Remove at your own risks.
 check_min_version("0.10.0.dev0")
 
-
-logger = get_logger(__name__)
+logger = logging.getLogger(__name__)
 
 
 def make_grid(images, size=64):
@@ -99,11 +100,13 @@ def get_full_repo_name(model_id: str, organization: Optional[str] = None, token:
 def main(args):
     logging_dir = os.path.join(args.output_dir, args.logging_dir)
 
+    set_logging(args, logging_dir)
+    
     augmentations = Compose(
         [
-            Resize(args.resolution, interpolation=InterpolationMode.BILINEAR),
-            CenterCrop(args.resolution),
-            #RandomHorizontalFlip(),
+            Resize((args.resolution,args.resolution), interpolation=InterpolationMode.BILINEAR),
+            #CenterCrop(args.resolution),
+            RandomHorizontalFlip(),
             ToTensor(),
             Normalize([0.5], [0.5]),
         ]
@@ -119,22 +122,14 @@ def main(args):
     else:
         dataset = load_dataset("imagefolder", data_dir=args.train_data_dir, cache_dir=args.cache_dir, split="train")
 
-
     def transforms(examples):
         images = [augmentations(image.convert("RGB")) for image in examples["image"]]
         return {"input": images}
-
-    logger.info(f"Dataset size: {len(dataset)}")
 
     dataset.set_transform(transforms)
     train_dataloader = torch.utils.data.DataLoader(
         dataset, batch_size=args.train_batch_size, shuffle=True, num_workers=args.dataloader_num_workers
     )
-
-    print(f"prediction type: {args.prediction_type}")
-    
-    if args.logger == 'wandb':
-        wb_run = set_wandb_project_run(args)
 
 
     accelerator = Accelerator(
@@ -149,15 +144,14 @@ def main(args):
     else:
         scheduler_fct = DDPMScheduler
 
-
     if args.finetune:
         # Prepare pretrained model
-        print(f"scheduler fct: {scheduler_fct}")
         image_pipe = DDPMPipeline.from_pretrained(args.pretrained_model)
         image_pipe.to("cuda")
         # Get a scheduler for sampling
-        noise_scheduler = scheduler_fct.from_config(args.pretrained_model)
-        noise_scheduler.set_timesteps(num_inference_steps=50)
+        sampling_scheduler = scheduler_fct.from_config(args.pretrained_model)
+        sampling_scheduler.set_timesteps(num_inference_steps=50)
+        model = image_pipe.unet
     else:
         model = UNet2DModel(
             sample_size=args.resolution,
@@ -194,8 +188,6 @@ def main(args):
         else:
             noise_scheduler = scheduler_fct(num_train_timesteps=args.ddpm_num_steps, beta_schedule=args.ddpm_beta_schedule)
 
-    if args.finetune:
-        model = image_pipe.unet
 
     optimizer = torch.optim.AdamW(
         model.parameters(),
@@ -205,28 +197,40 @@ def main(args):
         eps=args.adam_epsilon,
     )
 
+    num_update_steps_per_epoch = math.ceil(len(train_dataloader) / args.gradient_accumulation_steps)
+    total_train_steps = args.num_epochs * num_update_steps_per_epoch
+
     if args.lr_scheduler == 'exponential':
         lr_scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=0.9)
     else:
         lr_scheduler = get_scheduler(
             args.lr_scheduler,
             optimizer=optimizer,
-            num_warmup_steps=args.lr_warmup_steps,
-            num_training_steps=(len(train_dataloader) * args.num_epochs) // args.gradient_accumulation_steps,
+            num_warmup_steps=args.lr_warmup_steps * args.gradient_accumulation_steps,
+            num_training_steps=total_train_steps * args.gradient_accumulation_steps,
         )
+
+        logger.info(f"  LR Scheduler: {lr_scheduler}")
+        logger.info(f"  LR Optimizer: {lr_scheduler.optimizer}")
+        logger.info(f"  LR Warmup steps before grad acc: {args.lr_warmup_steps}")
+        logger.info(f"  LR total steps before grad acc: {total_train_steps}")
+        logger.info(f"  LR Warmup steps after grad acc: {args.lr_warmup_steps * args.gradient_accumulation_steps}")
+        logger.info(f"  LR total steps after grad acc: {total_train_steps * args.gradient_accumulation_steps}")
 
     model, optimizer, train_dataloader, lr_scheduler = accelerator.prepare(
         model, optimizer, train_dataloader, lr_scheduler
     )
+    
+    accelerator.register_for_checkpointing(lr_scheduler)
 
-    num_update_steps_per_epoch = math.ceil(len(train_dataloader) / args.gradient_accumulation_steps)
-
+    
     ema_model = EMAModel(
         accelerator.unwrap_model(model),
         inv_gamma=args.ema_inv_gamma,
         power=args.ema_power,
         max_value=args.ema_max_decay,
     )
+
 
     # Handle the repository creation
     if accelerator.is_main_process:
@@ -235,7 +239,6 @@ def main(args):
                 repo_name = get_full_repo_name(Path(args.output_dir).name, token=args.hub_token)
             else:
                 repo_name = args.hub_model_id
-            print(repo_name)
             repo = Repository(args.output_dir, clone_from=repo_name)
 
             with open(os.path.join(args.output_dir, ".gitignore"), "w+") as gitignore:
@@ -248,22 +251,38 @@ def main(args):
 
 
     if accelerator.is_main_process:
-        run = os.path.split(__file__)[-1].split(".")[0]
-        accelerator.init_trackers(run)
+        accelerator.init_trackers(project_name=args.output_dir, config=wandb_cfg(args))
+    #if args.logger == 'wandb':
+    #    wb_run = set_wandb_project_run(args)
 
+    logger.info("\n\n")
+    logger.info(f"  Training set len: {len(train_dataloader)}")
+    logger.info(f"  Prediction type: {args.prediction_type}")
+    logger.info(f"  Batch Size: {args.train_batch_size}")
+    logger.info(f"  Nbr update step per epoch: {num_update_steps_per_epoch}")
+    logger.info(f"  Nbr train steps: {total_train_steps}")
+    logger.info(f"  Scheduler fct: {scheduler_fct}")
+    logger.info(f"  LR Scheduler: {lr_scheduler}")
+    logger.info(f"  Log Tracker: {accelerator.trackers}")
 
     global_step = 0
     for epoch in range(args.num_epochs):
+        logger.info(f"  epoch: {epoch}")
         if not args.finetune:
             model.train()
         progress_bar = tqdm(total=num_update_steps_per_epoch, disable=not accelerator.is_local_main_process)
         progress_bar.set_description(f"Epoch {epoch}")
-        for step, batch in enumerate(train_dataloader):
+        for step, batch in enumerate(train_dataloader): #, total=len(train_dataloader)):
 
             clean_images = batch["input"]
             # Sample noise that we'll add to the images
             noise = torch.randn(clean_images.shape).to(clean_images.device)
             batch_shape = clean_images.shape[0]
+
+            ##
+            # batch.to(accelerator.device) 
+            ##
+
             # Sample a random timestep for each image
             if args.finetune:
                 sch_train_steps = image_pipe.scheduler.num_train_timesteps
@@ -305,23 +324,18 @@ def main(args):
                     raise ValueError(f"Unsupported prediction type: {args.prediction_type}")
 
 
-                ## Log the loss
-                if args.logger == 'wandb':
-                    wb_run.log({'loss':loss.item()})
-
                 accelerator.backward(loss)
 
                 if accelerator.sync_gradients:
                     accelerator.clip_grad_norm_(model.parameters(), 1.0)
 
+
+                #if (step+1) % args.gradient_accumulation_steps == 0:
                 optimizer.step()
-                                
                 if args.lr_scheduler != 'exponential':
                     lr_scheduler.step()
-                
                 if args.use_ema:
                     ema_model.step(model)
-                
                 optimizer.zero_grad()
                 
 
@@ -330,9 +344,7 @@ def main(args):
                 progress_bar.update(1)
                 global_step += 1
 
-
             logs = {"loss": loss.detach().item(), "lr": lr_scheduler.get_last_lr()[0], "step": global_step}
-
 
             if args.use_ema:
                 logs["ema_decay"] = ema_model.decay
@@ -342,19 +354,18 @@ def main(args):
 
             if accelerator.is_main_process:
                 if args.log_images_every == "steps":
-                    if (step+1)%args.save_images_steps == 0 or step == 1:
-                        print("Logging images")
+                    if (global_step) % args.save_images_steps == 0 or global_step == 1 or global_step == total_train_steps:
                         if args.finetune:
                             x = torch.randn(8, 3, args.resolution, args.resolution).to('cuda') # Batch of 8
-                            for i, t in tqdm(enumerate(noise_scheduler.timesteps)):
-                                model_input = noise_scheduler.scale_model_input(x, t)
+                            for i, t in tqdm(enumerate(sampling_scheduler.timesteps)):
+                                model_input = sampling_scheduler.scale_model_input(x, t)
                                 with torch.no_grad():
                                     noise_pred = image_pipe.unet(model_input, t)["sample"]
-                                x = noise_scheduler.step(noise_pred, t, x).prev_sample
+                                x = sampling_scheduler.step(noise_pred, t, x).prev_sample
                             grid = torchvision.utils.make_grid(x, nrow=4)
                             im = grid.permute(1, 2, 0).cpu().clip(-1, 1)*0.5 + 0.5
                             im = Image.fromarray(np.array(im*255).astype(np.uint8))
-                            wandb.log({'Sample generations': wandb.Image(im)})
+                            accelerator.log({'Sample generations': wandb.Image(im)}, step=global_step)
                         else:
                             pipeline = DDPMPipeline(
                                 unet=accelerator.unwrap_model(ema_model.averaged_model if args.use_ema else model),
@@ -374,7 +385,7 @@ def main(args):
                                 # denormalize the images and save to tensorboard
                                 images_processed = (images * 255).round().astype("uint8")
                                 accelerator.get_tracker("tensorboard").add_images(
-                                    "test_samples", images_processed.transpose(0, 3, 1, 2), epoch
+                                    "test_samples", images_processed.transpose(0, 3, 1, 2), global_step
                                 )
                             else:
                                 images = pipeline(
@@ -382,12 +393,15 @@ def main(args):
                                     batch_size=args.eval_batch_size,
                                 ).images
                                 im = make_grid(images, args.resolution)
-                                wandb.log({'Sample generations': wandb.Image(im)})
+                                accelerator.log({'Sample generations': wandb.Image(im)}, step=global_step)
                 
                 if args.save_model_every == "steps":
-                    if (step+1)%args.save_model_steps == 0:
-                        image_pipe.save_pretrained(f"{args.output_dir}_step_{step}")
-
+                    if (global_step % args.save_model_steps == 0 and global_step > 1000) or global_step == total_train_steps:
+                        image_pipe.save_pretrained(f"{args.output_dir}_step_{global_step}")
+            
+            if global_step >= total_train_steps:
+                break
+        
         progress_bar.close()
 
         accelerator.wait_for_everyone()
@@ -422,7 +436,7 @@ def main(args):
                             batch_size=args.eval_batch_size,
                         ).images
                         im = make_grid(images, args.resolution)
-                        wandb.log({'Sample generations': wandb.Image(im)})
+                        accelerator.log({'Sample generations': wandb.Image(im)})
 
             if args.save_model_every == "epochs":
                 if epoch % args.save_model_epochs == 0 or epoch == args.num_epochs - 1:
