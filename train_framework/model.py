@@ -1,8 +1,8 @@
 import math
+import torch
 from inspect import isfunction
 from functools import partial
 from einops import rearrange
-import torch
 from torch import nn, einsum
 import torch.nn.functional as F
 
@@ -323,23 +323,3 @@ class Unet(nn.Module):
             x = upsample(x)
 
         return self.final_conv(x)
-
-
-#class Conditional_Unet(Unet):
-#    def __init__(self, 
-#                 dim, 
-#                 block_type='resnet',
-#                 num_classes=None):
-#        super().__init__(dim=dim, block_type=block_type)
-#        if num_classes is not None:
-#            self.label_emb = nn.Embedding(num_classes, time_emb_dim)
-#
-#
-#    def forward(self, x, t, y=None):
-#        # t = t.unsqueeze(-1)
-#        t = self.pos_encoding(t, self.time_dim)
-#
-#        if y is not None:
-#            t += self.label_emb(y)
-#
-#        return self.unet_forwad(x, t)

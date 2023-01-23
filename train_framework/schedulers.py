@@ -14,18 +14,21 @@ def cosine_beta_schedule(timesteps, s=0.008):
 
 
 def linear_beta_schedule(timesteps):
+    """ Linear schedule for the learning rate. """
     beta_start = 0.0001
     beta_end = 0.02
     return torch.linspace(beta_start, beta_end, timesteps)
 
 
 def quadratic_beta_schedule(timesteps):
+    """ Quadratic schedule for the learning rate. """
     beta_start = 0.0001
     beta_end = 0.02
     return torch.linspace(beta_start**0.5, beta_end**0.5, timesteps) ** 2
 
 
 def sigmoid_beta_schedule(timesteps):
+    """ Sigmoid schedule for the learning rate. """
     beta_start = 0.0001
     beta_end = 0.02
     betas = torch.linspace(-6, 6, timesteps)

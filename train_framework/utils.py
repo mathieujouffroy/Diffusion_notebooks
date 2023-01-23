@@ -29,7 +29,6 @@ def set_logging(args, log_dir):
         format="%(asctime)s - %(levelname)s - %(name)s -   %(message)s", datefmt="%m/%d/%Y %H:%M:%S",
         level=logging.INFO,
         handlers=[logging.StreamHandler(), logging.FileHandler(log_file)],
-        #force=True
     )
     
 
@@ -49,25 +48,39 @@ class YamlNamespace(argparse.Namespace):
 def wandb_cfg(args):
     # SETUP WANDB
     config_dict = {
-        "dataset_name": args.dataset_name,
-        "model_name": args.output_dir,
+        "dataset_name": args.dataset_id,
         "seed": args.seed,
         "resolution": args.resolution,
-        "nbr_channels": args.nbr_channels,
         "train_batch_size": args.train_batch_size,
         "eval_batch_size": args.eval_batch_size,
-        "num_epochs": args.num_epochs,
+        "num_train_epochs": args.num_train_epochs,
         "pretrained_model": args.pretrained_model,
         "gradient_accumulation_steps": args.gradient_accumulation_steps,
         "learning_rate": args.learning_rate,
         "lr_scheduler": args.lr_scheduler,
-        "lr_warmup_steps": args.lr_warmup_steps,
-        "adam_weight_decay": args.adam_weight_decay,
-        "ddpm_num_steps": args.ddpm_num_steps,
-        "ddpm_beta_schedule": args.ddpm_beta_schedule,
+        #"lr_warmup_steps": args.lr_warmup_steps,
+        #"adam_weight_decay": args.adam_weight_decay,
+        #"ddpm_num_steps": args.ddpm_num_steps,
+        #"ddpm_beta_schedule": args.ddpm_beta_schedule,
         "loss_type": args.loss_type,
         "use_ema": args.use_ema,
+
+        ## dreambooth
+        "max_train_steps": args.max_train_steps,
+        "instance_prompt": args.instance_prompt,
+        '8bit_adam ': args.use_8bit_adam,
+        "max_grad_norm": args.max_grad_norm,
+        "gradient_checkpointing": args.gradient_checkpointing,
     }
+
+    if args.with_prior_preservation:
+        config_dict["num_class_images"] = args.num_class_images
+        config_dict["prior_loss_weight"] = args.prior_loss_weight
+        config_dict["class_data_dir"] = args.class_data_dir
+        config_dict["class_prompt"] = args.class_prompt
+        config_dict['sample_batch_size'] = args.sample_batch_size
+        
+    
     return config_dict
 
 
