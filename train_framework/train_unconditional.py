@@ -1,18 +1,17 @@
-import argparse
-import inspect
-import math
 import os
+import math
 import yaml
+import inspect
+import argparse
+import logging
 import numpy as np
-from pathlib import Path
-from typing import Optional
-
-from PIL import Image
-
 import torch, torchvision
 import torch.nn.functional as F
 
-import logging
+from PIL import Image
+from pathlib import Path
+from typing import Optional
+from tqdm.auto import tqdm
 
 from accelerate import Accelerator
 from accelerate.logging import get_logger
@@ -31,7 +30,7 @@ from torchvision.transforms import (
     Resize,
     ToTensor,
 )
-from tqdm.auto import tqdm
+
 
 import wandb
 
@@ -43,7 +42,7 @@ check_min_version("0.10.0.dev0")
 logger = logging.getLogger(__name__)
 
 
-def make_grid(images, size=64):
+def make_grid(images: list, size: int = 64):
     """Given a list of PIL images, stack them together into a line for easy viewing"""
     output_im = Image.new("RGB", (size * len(images), size))
     for i, im in enumerate(images):
@@ -51,7 +50,7 @@ def make_grid(images, size=64):
     return output_im
 
 
-def _extract_into_tensor(arr, timesteps, broadcast_shape):
+def _extract_into_tensor(arr: np.array, timesteps, broadcast_shape):
     """
     Extract values from a 1-D numpy array for a batch of indices.
 
@@ -97,7 +96,7 @@ def get_full_repo_name(model_id: str, organization: Optional[str] = None, token:
         return f"{organization}/{model_id}"
 
 
-def main(args):
+def main(args: argparse.Namespace):
     logging_dir = os.path.join(args.output_dir, args.logging_dir)
 
     set_logging(args, logging_dir)
@@ -105,7 +104,7 @@ def main(args):
     augmentations = Compose(
         [
             Resize((args.resolution,args.resolution), interpolation=InterpolationMode.BILINEAR),
-            #CenterCrop(args.resolution),
+            CenterCrop(args.resolution),
             RandomHorizontalFlip(),
             ToTensor(),
             Normalize([0.5], [0.5]),
@@ -155,8 +154,8 @@ def main(args):
     else:
         model = UNet2DModel(
             sample_size=args.resolution,
-            in_channels=args.nbr_channels,
-            out_channels=args.nbr_channels,
+            in_channels=3,
+            out_channels=3,
             layers_per_block=2,
             block_out_channels=(128, 128, 256, 256, 512, 512),
             down_block_types=(
