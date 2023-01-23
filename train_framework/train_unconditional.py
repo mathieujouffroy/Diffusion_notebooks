@@ -277,10 +277,7 @@ def main(args: argparse.Namespace):
             # Sample noise that we'll add to the images
             noise = torch.randn(clean_images.shape).to(clean_images.device)
             batch_shape = clean_images.shape[0]
-
-            ##
-            # batch.to(accelerator.device) 
-            ##
+            batch.to(accelerator.device)
 
             # Sample a random timestep for each image
             if args.finetune:
@@ -297,7 +294,6 @@ def main(args: argparse.Namespace):
             else:
                 noisy_images = noise_scheduler.add_noise(clean_images, noise, timesteps)
 
-
             with accelerator.accumulate(model):
                 # Predict the noise residual
                 if args.finetune:
@@ -308,7 +304,6 @@ def main(args: argparse.Namespace):
                 if args.prediction_type == "epsilon":
                     # Compare the prediction with the actual noise:
                     loss = F.mse_loss(model_output, noise)  # this could have different weights!
-                
                 elif args.prediction_type == "sample":
                     alpha_t = _extract_into_tensor(
                         noise_scheduler.alphas_cumprod, timesteps, (clean_images.shape[0], 1, 1, 1)
@@ -318,16 +313,13 @@ def main(args: argparse.Namespace):
                         model_output, clean_images, reduction="none"
                     )  # use SNR weighting from distillation paper
                     loss = loss.mean()
-                
                 else:
                     raise ValueError(f"Unsupported prediction type: {args.prediction_type}")
-
 
                 accelerator.backward(loss)
 
                 if accelerator.sync_gradients:
                     accelerator.clip_grad_norm_(model.parameters(), 1.0)
-
 
                 optimizer.step()
                 if args.lr_scheduler != 'exponential':
@@ -336,7 +328,6 @@ def main(args: argparse.Namespace):
                     ema_model.step(model)
                 optimizer.zero_grad()
                 
-
             # Checks if the accelerator has performed an optimization step behind the scenes
             if accelerator.sync_gradients:
                 progress_bar.update(1)
