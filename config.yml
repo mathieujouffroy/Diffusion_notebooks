@@ -9,11 +9,10 @@ logger: "wandb"
 
 seed: 42
 resolution: 256
-nbr_channels: 3
 train_batch_size: 4
 eval_batch_size: 4
 dataloader_num_workers: 0
-num_epochs: 1
+num_train_epochs: 1
 log_images_every: "steps" #"epochs" 
 save_model_every: "steps" #"epochs" 
 save_images_epochs: 1
