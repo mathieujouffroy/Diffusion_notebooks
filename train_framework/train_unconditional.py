@@ -49,8 +49,7 @@ def make_grid(images: list, size: int = 64):
         output_im.paste(im.resize((size, size)), (i * size, 0))
     return output_im
 
-
-def _extract_into_tensor(arr: np.array, timesteps, broadcast_shape):
+def _extract_into_tensor(arr, timesteps , broadcast_shape):
     """
     Extract values from a 1-D numpy array for a batch of indices.
 

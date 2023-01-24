@@ -2,9 +2,7 @@ import torch
 import torch.nn.functional as F
 
 def cosine_beta_schedule(timesteps, s=0.008):
-    """
-    cosine schedule as proposed in https://arxiv.org/abs/2102.09672
-    """
+    """Cosine schedule as proposed in https://arxiv.org/abs/2102.09672."""
     steps = timesteps + 1
     x = torch.linspace(0, timesteps, steps)
     alphas_cumprod = torch.cos(((x / timesteps) + s) / (1 + s) * torch.pi * 0.5) ** 2
@@ -14,21 +12,21 @@ def cosine_beta_schedule(timesteps, s=0.008):
 
 
 def linear_beta_schedule(timesteps):
-    """ Linear schedule for the learning rate. """
+    """Linear schedule for the noise scheduler."""
     beta_start = 0.0001
     beta_end = 0.02
     return torch.linspace(beta_start, beta_end, timesteps)
 
 
 def quadratic_beta_schedule(timesteps):
-    """ Quadratic schedule for the learning rate. """
+    """Quadratic schedule for the noise scheduler."""
     beta_start = 0.0001
     beta_end = 0.02
     return torch.linspace(beta_start**0.5, beta_end**0.5, timesteps) ** 2
 
 
 def sigmoid_beta_schedule(timesteps):
-    """ Sigmoid schedule for the learning rate. """
+    """Sigmoid schedule for the noise scheduler."""
     beta_start = 0.0001
     beta_end = 0.02
     betas = torch.linspace(-6, 6, timesteps)
@@ -36,6 +34,7 @@ def sigmoid_beta_schedule(timesteps):
 
 
 def get_components_list(betas):
+    """Retrieve the list of components for the noise scheduler."""
     # define alphas 
     alphas = 1. - betas # α
     alphas_cumprod = torch.cumprod(alphas, axis=0) # α_bar
