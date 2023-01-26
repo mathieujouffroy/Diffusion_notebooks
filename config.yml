@@ -7,6 +7,8 @@ logging_dir: "logs"
 # Whether to use ["tensorboard", "wandb"]
 logger: "wandb"
 
+train_type: "train_unconditional"
+
 seed: 42
 resolution: 256
 train_batch_size: 4

@@ -77,13 +77,13 @@ def wandb_cfg(args):
         "loss_type": args.loss_type,
         "use_ema": args.use_ema,
     }
-    if args.train_unconditional:
+    if args.train_type == "train_unconditional":
         config_dict["lr_warmup_steps"] = args.lr_warmup_steps
         config_dict["adam_weight_decay"] = args.adam_weight_decay
         config_dict["ddpm_num_steps"] = args.ddpm_num_steps
         config_dict["ddpm_beta_schedule"] = args.ddpm_beta_schedule
 
-    if args.train_dreambooth:
+    elif args.train_type == "train_dreambooth":
         config_dict["max_train_steps"] = args.max_train_steps
         config_dict["instance_prompt"] = args.instance_prompt
         config_dict['8bit_adam '] = args.use_8bit_adam
