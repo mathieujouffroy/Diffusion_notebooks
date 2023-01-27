@@ -59,6 +59,7 @@ def _extract_into_tensor(arr, timesteps , broadcast_shape):
                             dimension equal to the length of timesteps.
     :return: a tensor of shape [batch_size, 1, ...] where the shape has K dims.
     """
+    
     if not isinstance(arr, torch.Tensor):
         arr = torch.from_numpy(arr)
     res = arr[timesteps].float().to(timesteps.device)
@@ -86,6 +87,8 @@ def parse_args():
 
 
 def get_full_repo_name(model_id: str, organization: Optional[str] = None, token: Optional[str] = None):
+    """Get the full repository name for a given model id."""
+
     if token is None:
         token = HfFolder.get_token()
     if organization is None:
@@ -96,6 +99,8 @@ def get_full_repo_name(model_id: str, organization: Optional[str] = None, token:
 
 
 def main(args: argparse.Namespace):
+    """ Main training loop. """
+
     logging_dir = os.path.join(args.output_dir, args.logging_dir)
 
     set_logging(args, logging_dir)
